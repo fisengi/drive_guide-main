@@ -33,6 +33,23 @@ import 'roadCurveAlgorithm.dart';
 import 'simulationFunctions.dart';
 import 'globals.dart';
 
+import 'package:fluttertoast/fluttertoast.dart';
+
+class kullanici {
+  int? speed;
+  LatLng? coordination;
+}
+
+class curveAndLatlng {
+  double? curve;
+  LatLng? coordination;
+
+  curveAndLatlng(double curv, LatLng polylineCoordinat) {
+    curve = curv;
+    coordination = polylineCoordinat;
+  }
+}
+
 class TrackingPage extends StatefulWidget {
   final User user;
 
@@ -55,6 +72,8 @@ class TrackingPageState extends State<TrackingPage> {
 
   LocationData? currentLocation;
   Location location = Location();
+
+  List<curveAndLatlng> curveWithLatlng = [];
 
   LatLng? destination = null;
 
@@ -95,11 +114,24 @@ class TrackingPageState extends State<TrackingPage> {
 
   Account? account;
 
+  double distanceToCurve = double.infinity;
+  int curveIndex = 0;
+
+  Future<void> loadLatlngToCurves(
+      List<LatLng> polylineCoordinates, List<double> curves) async {
+    curveWithLatlng.clear();
+
+    for (int i = 0; i < curves.length; i++) {
+      curveWithLatlng
+          .add(curveAndLatlng(curves[i], polylineCoordinates[i + 1]));
+    }
+  }
+
   void _fetchAccount() async {
-    print("FETCHING ACCOUNT");
+    // print("FETCHING ACCOUNT");
     if (user != null) {
       try {
-        print(user!.uid);
+        // print(user!.uid);
         var snapshot = await _firestore
             .collection('Account')
             .where('userId', isEqualTo: user!.uid)
@@ -107,12 +139,10 @@ class TrackingPageState extends State<TrackingPage> {
 
         // Check if an account is found
         if (snapshot.docs.isNotEmpty) {
-          print("alskjdlkjsdkla");
           var doc = snapshot.docs.first;
-          print(doc.data());
+
           var accountData = doc.data();
-          print("asdasdasdlaskdasd");
-          print(accountData);
+
           setState(() {
             //burada accounta eşitlenmeli
           });
@@ -200,6 +230,7 @@ class TrackingPageState extends State<TrackingPage> {
 
   Future<void> startSimulation() async {
     _initCarMarker();
+
     final GoogleMapController controller = await _controller.future;
     await controller?.animateCamera(CameraUpdate.newCameraPosition(
       CameraPosition(
@@ -213,11 +244,14 @@ class TrackingPageState extends State<TrackingPage> {
 
     await Future.delayed(const Duration(seconds: 5));
     lastRouteIndex = 0;
+    distanceToCurve = double.infinity;
+    curveIndex = 0;
     // Resetting and starting the simulation with the initial speed.
-    startOrRestartTimer(lastRouteIndex);
+    startOrRestartTimer(lastRouteIndex, distanceToCurve, curveIndex);
   }
 
-  void startOrRestartTimer(int startIndex) {
+  void startOrRestartTimer(
+      int startIndex, double distanceToCurve, int curveIndexx) {
     timer?.cancel(); // Cancel any existing timer.
     // Reset the route index.
 
@@ -230,6 +264,11 @@ class TrackingPageState extends State<TrackingPage> {
       if (startIndex < simulationCoordinates.length &&
           simulationMode == true &&
           isStopped == false) {
+        if (curveWithLatlng.isNotEmpty) {
+          speedControl(
+              simulationCoordinates[startIndex], speedSliderValue.round());
+        }
+
         _updatePosition(simulationCoordinates[startIndex]);
         lastRouteIndex = startIndex; // Update the last position of routeIndex
         startIndex++;
@@ -240,11 +279,113 @@ class TrackingPageState extends State<TrackingPage> {
     });
   }
 
+  // void showToast(String message) {
+  //   Future.delayed(Duration.zero, () {
+  //     Fluttertoast.showToast(
+  //         msg: message,
+  //         toastLength: Toast.LENGTH_SHORT,
+  //         gravity: ToastGravity.TOP,
+  //         timeInSecForIosWeb: 1,
+  //         backgroundColor: forColors.Colors.grey[900],
+  //         textColor: forColors.Colors.white,
+  //         fontSize: 16.0);
+  //   });
+  // }
+
+  showSnackBar100(context) {
+    SnackBar snackBar = SnackBar(
+      content: const Text('Max Speed 100', style: TextStyle(fontSize: 20)),
+      backgroundColor: forColors.Colors.green,
+      dismissDirection: DismissDirection.up,
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 2),
+      margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.height - 150,
+          left: 10,
+          right: 10),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
+
+  showSnackBar90(context) {
+    SnackBar snackBar = SnackBar(
+      content: const Text('Max Speed 90', style: TextStyle(fontSize: 20)),
+      backgroundColor: forColors.Colors.orange,
+      dismissDirection: DismissDirection.up,
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 2),
+      margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.height - 150,
+          left: 10,
+          right: 10),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
+
+  showSnackBar80(context) {
+    SnackBar snackBar = SnackBar(
+      content: const Text('Max Speed 80', style: TextStyle(fontSize: 20)),
+      backgroundColor: forColors.Colors.red,
+      dismissDirection: DismissDirection.up,
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 2),
+      margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.height - 150,
+          left: 10,
+          right: 10),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
+
+  void speedControl(LatLng coordinatOfCar, int speedOfCar) {
+    double temp = Geolocator.distanceBetween(
+      coordinatOfCar.latitude,
+      coordinatOfCar.longitude,
+      curveWithLatlng[curveIndex].coordination!.latitude,
+      curveWithLatlng[curveIndex].coordination!.longitude,
+    );
+
+    if (temp > distanceToCurve && curveIndex < curveWithLatlng.length) {
+      curveIndex++;
+      distanceToCurve = double.infinity;
+      // print("curve index arttı");
+      // print("temp büyük");
+    } else {
+      // print("temp küçük");
+      // print("distance to curve => ${distanceToCurve}");
+      if (temp < distanceToCurve) {
+        distanceToCurve = temp;
+        // print(distanceToCurve);
+        if (distanceToCurve < 200) {
+          // print("Curve => ${curveWithLatlng[curveIndex].curve!}");
+          if (curveWithLatlng[curveIndex].curve! > 30 && speedOfCar > 80) {
+            // ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            showSnackBar80(context);
+            print("MAX SPEED 100");
+          } else if (curveWithLatlng[curveIndex].curve! > 20 &&
+              speedOfCar > 90) {
+            // ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            showSnackBar90(context);
+            print("MAX SPEED 90");
+          } else if (curveWithLatlng[curveIndex].curve! > 10 &&
+              speedOfCar > 100) {
+            // ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            showSnackBar100(context);
+            print("MAX SPEED 80");
+          }
+        }
+      }
+    }
+  }
+
 // Optionally, add a method or listener to change the timer interval
 // when speedSliderValue changes.
   void onSpeedSliderValueChanged(double value) {
-    startOrRestartTimer(
-        lastRouteIndex + 1); // Restart the timer with new interval.
+    startOrRestartTimer(lastRouteIndex + 1, distanceToCurve,
+        curveIndex); // Restart the timer with new interval.
   }
 
   void _updatePosition(LatLng newPosition) async {
@@ -326,7 +467,7 @@ class TrackingPageState extends State<TrackingPage> {
   }
 
   void _onCameraMove(CameraPosition position) {
-    print('The current zoom level is: ${position.zoom}');
+    // print('The current zoom level is: ${position.zoom}');
   }
 
   TextEditingController searchController = TextEditingController();
@@ -559,8 +700,14 @@ class TrackingPageState extends State<TrackingPage> {
 
       // print("INNER RADIUS");
       // findRadius(polylineCoordinates);
+      loadLatlngToCurves(polylineCoordinates, curves);
+
+      // print(curves);
+      // print("curves length =>${curves.length} ");
+      // print("polyline lenght => ${polylineCoordinates.length}");
 
       allCircles = calculateTurnAngleZoomOut(polylineCoordinates);
+      // print("after that");
     }
 
     Set<Circle> circlesss = {

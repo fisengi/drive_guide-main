@@ -135,10 +135,10 @@ List<ZoomOutTurnAngle> calculateTurnAngleZoomOut(
   }
   List<ZoomOutTurnAngle> returnCircles = checkForDistanceInCircles(allCircles);
 
-  for (int i = 0; i < returnCircles.length; i++) {
-    print(
-        "Circle ${i} => ${returnCircles[i].color}, ${returnCircles[i].circleSize}, ${returnCircles[i].coordination}");
-  }
+  // for (int i = 0; i < returnCircles.length; i++) {
+  //   print(
+  //       "Circle ${i} => ${returnCircles[i].color}, ${returnCircles[i].circleSize}, ${returnCircles[i].coordination}");
+  // }
 
   return returnCircles;
 }
