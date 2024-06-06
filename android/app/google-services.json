@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "686836839340",
+    "project_id": "driveguide-993ad",
+    "storage_bucket": "driveguide-993ad.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:686836839340:android:580a839faf1b37fc62c009",
+        "android_client_info": {
+          "package_name": "com.example.drive_guide"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_T92lOU1cmC3VOLU7opTlvdJdBl_SOu4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
