@@ -2,6 +2,7 @@ import 'package:drive_guide/Models/Account.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:drive_guide/tracking.dart';
+import 'package:drive_guide/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -11,6 +12,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   Future<User?> signInWithEmail(String email, String password) async {
     try {
@@ -104,6 +106,12 @@ class _LoginPageState extends State<LoginPage> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
+              Hero(
+                  tag: 'logo',
+                  child: Container(
+                    height: 120,
+                    child: Image.asset('images/logo_dg.png'),
+                  )),
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
@@ -155,6 +163,21 @@ class _LoginPageState extends State<LoginPage> {
                 style: TextButton.styleFrom(
                   primary: Colors
                       .blueGrey[800], // using TextButton for less emphasis
+                ),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton.icon(
+                icon: Image.asset('images/google_logo.png', height: 24.0),
+                label: Text('Sign in with Google'),
+                onPressed: () => AuthService().signInWithGoogle(context,
+                    (isLoading) => setState(() => _isLoading = isLoading)),
+                style: ElevatedButton.styleFrom(
+                  primary: Colors.white,
+                  onPrimary: Colors.grey[800],
+                  textStyle: TextStyle(color: Colors.black),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ],

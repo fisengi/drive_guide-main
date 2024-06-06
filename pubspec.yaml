@@ -50,6 +50,9 @@ dependencies:
     latlong2: ^0.8.0
     firebase_core: ^2.27.0
     firebase_auth: ^4.17.8
+    google_sign_in: ^6.2.1
+    firebase_storage: ^11.6.9
+    image_picker: ^1.0.8
 
 dev_dependencies:
     flutter_test:
@@ -77,6 +80,9 @@ flutter:
         - images/dg_logo.png
         - images/DriveGuide.png
         - images/Group_Member.png
+        - images/google_logo.png
+        - images/default_profilepicture.png
+        - images/logo_dg.png
     #   - images/a_dot_ham.jpeg
 
     # An image asset can refer to one or more resolution-specific "variants", see

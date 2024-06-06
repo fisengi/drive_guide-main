@@ -5,6 +5,7 @@ import 'dart:ui';
 
 import 'package:drive_guide/Models/Account.dart';
 import 'package:drive_guide/login_page.dart';
+import 'package:drive_guide/profile_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:location/location.dart';
 import 'package:flutter_google_places/flutter_google_places.dart';
@@ -13,9 +14,6 @@ import 'package:google_maps_webservice/places.dart' as gmaps;
 import 'dart:math';
 //keep all member in the view, yavaşsa detaylı hızlıysa biraz daha detaysız göster. yakın curveleri tek circleda göster. curvelerin sıklığına göre derecesi değişiyor. curvelerde uyarı zamanı hıza göre değişecek
 // hızların sağ üste ekle hız sınırı viraj keskinliği rakamsal olarak Sesli uyarı. Redis grup view. Group sesli konuşma. Chat view
-import 'dart:math';
-
-import 'package:location/location.dart';
 
 import 'constant.dart';
 import 'group_view.dart';
@@ -101,12 +99,14 @@ class TrackingPageState extends State<TrackingPage> {
   Marker? groupMember;
 
   Timer? timer;
+  Timer? _locationUpdateTimer;
+  Timer? _groupLocationUpdateTimer;
   List<LatLng> simulationCoordinates = [];
 
   bool simulationMode = false;
   bool isStopped = false;
   int simulationSpeed = 60;
-
+  final Set<Marker> _markers = {};
   bool groupViewMode = false;
   String groupView = 'closed';
   BitmapDescriptor carIcon = BitmapDescriptor.defaultMarker;
@@ -139,26 +139,151 @@ class TrackingPageState extends State<TrackingPage> {
 
         // Check if an account is found
         if (snapshot.docs.isNotEmpty) {
+          print("alskjdlkjsdkla");
           var doc = snapshot.docs.first;
-
+          print(doc.data());
           var accountData = doc.data();
-
+          print("asdasdasdlaskdasd");
+          print(accountData);
           setState(() {
             //burada accounta eşitlenmeli
+            account = Account.fromJson(accountData);
+            print("Account synced: $account");
           });
         } else {
           print("No account found for the user ID.");
           setState(() {
             account = null; // Ensure account is cleared if no data is found
+            print("Account set to null");
           });
         }
       } catch (e) {
         print("Failed to fetch account: $e");
         setState(() {
           account = null;
+          print("Account set to null due to error");
         });
       }
     }
+  }
+
+  void _updateLocation() async {
+    if (user != null) {
+      try {
+        Position position = await _determinePosition();
+        GeoPoint geoPoint = GeoPoint(position.latitude, position.longitude);
+        print(
+            "User's location: Latitude: ${geoPoint.latitude}, Longitude: ${geoPoint.longitude}");
+
+        var snapshot = await _firestore
+            .collection('Account')
+            .where('userId', isEqualTo: user!.uid)
+            .get();
+
+        if (snapshot.docs.isNotEmpty) {
+          var doc = snapshot.docs.first;
+          await _firestore
+              .collection('Account')
+              .doc(doc.id)
+              .update({'location': geoPoint});
+          print("Location updated in Firestore");
+        }
+      } catch (e) {
+        print("Failed to update location: $e");
+      }
+    }
+  }
+
+  void _updateGroupLocations() async {
+    if (widget.user != null) {
+      var currentUserSnapshot = await _firestore
+          .collection('Account')
+          .where('userId', isEqualTo: widget.user.uid)
+          .get();
+
+      if (currentUserSnapshot.docs.isNotEmpty) {
+        var currentUserDoc = currentUserSnapshot.docs.first;
+
+        List<dynamic> groupWithList = currentUserDoc['groupWith'];
+
+        Set<Marker> groupMarkers = {};
+        groupMarkers.add(Marker(
+          markerId: MarkerId('currentUser'),
+          position: LatLng(currentUserDoc['location'].latitude,
+              currentUserDoc['location'].longitude),
+          icon: groupMemberIcon,
+        ));
+
+        for (var groupMember in groupWithList) {
+          var groupMemberSnapshot = await _firestore
+              .collection('Account')
+              .where('userId', isEqualTo: groupMember['userId'])
+              .get();
+
+          if (groupMemberSnapshot.docs.isNotEmpty) {
+            var groupMemberDoc = groupMemberSnapshot.docs.first;
+            var groupMemberLocation = groupMemberDoc['location'];
+
+            groupMarkers.add(Marker(
+              markerId: MarkerId(groupMember['userId']),
+              position: LatLng(
+                  groupMemberLocation.latitude, groupMemberLocation.longitude),
+              icon: groupMemberIcon,
+            ));
+          }
+        }
+
+        setState(() {
+          _markers.clear();
+          _markers.addAll(groupMarkers);
+        });
+
+        if (groupViewMode) {
+          // Update the camera view to show all markers
+          final GoogleMapController controller = await _controller.future;
+          LatLngBounds bounds = _createBoundsForMarkers(groupMarkers);
+          CameraUpdate cameraUpdate = CameraUpdate.newLatLngBounds(bounds, 50);
+          controller.animateCamera(cameraUpdate);
+        }
+      }
+    }
+  }
+
+  Future<Position> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return Future.error('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return Future.error('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.');
+    }
+
+    return await Geolocator.getCurrentPosition();
+  }
+
+  void _startLocationUpdates() {
+    _locationUpdateTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+      _updateLocation();
+    });
+  }
+
+  void _startGroupLocationUpdates() {
+    _groupLocationUpdateTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+      _updateGroupLocations();
+    });
   }
 
   void loadRouteSimulation(List<LatLng> coordinates) {
@@ -191,6 +316,82 @@ class TrackingPageState extends State<TrackingPage> {
       markerId: MarkerId("car"),
       position: sourceLocation,
       icon: carIcon,
+    );
+  }
+
+  void _initGroupView(BuildContext context) async {
+    try {
+      // Fetch both user's locations from Firestore
+      User? currentUser = widget.user;
+      if (currentUser != null) {
+        var currentUserSnapshot = await _firestore
+            .collection('Account')
+            .where('userId', isEqualTo: currentUser.uid)
+            .get();
+
+        if (currentUserSnapshot.docs.isNotEmpty) {
+          var currentUserDoc = currentUserSnapshot.docs.first;
+
+          List<dynamic> groupWithList = currentUserDoc['groupWith'];
+
+          Set<Marker> groupMarkers = {};
+          groupMarkers.add(Marker(
+            markerId: MarkerId('currentUser'),
+            position: LatLng(currentUserDoc['location'].latitude,
+                currentUserDoc['location'].longitude),
+            icon: groupMemberIcon, //değiştir burayı
+          ));
+
+          for (var groupMember in groupWithList) {
+            groupMarkers.add(Marker(
+              markerId: MarkerId(groupMember['userId']),
+              position: LatLng(groupMember['location'].latitude,
+                  groupMember['location'].longitude),
+              icon: groupMemberIcon,
+            ));
+          }
+
+          setState(() {
+            _markers.addAll(groupMarkers);
+            groupViewMode = true;
+          });
+
+          // Update the camera view to show all markers
+          final GoogleMapController controller = await _controller.future;
+          LatLngBounds bounds = _createBoundsForMarkers(groupMarkers);
+          CameraUpdate cameraUpdate = CameraUpdate.newLatLngBounds(bounds, 50);
+          controller.animateCamera(cameraUpdate);
+        }
+      }
+    } catch (e) {
+      print("Failed to initialize group view: $e");
+    }
+  }
+
+  LatLngBounds _createBoundsForMarkers(Set<Marker> markers) {
+    double southWestLat = markers.first.position.latitude;
+    double southWestLng = markers.first.position.longitude;
+    double northEastLat = markers.first.position.latitude;
+    double northEastLng = markers.first.position.longitude;
+
+    markers.forEach((marker) {
+      if (marker.position.latitude < southWestLat) {
+        southWestLat = marker.position.latitude;
+      }
+      if (marker.position.longitude < southWestLng) {
+        southWestLng = marker.position.longitude;
+      }
+      if (marker.position.latitude > northEastLat) {
+        northEastLat = marker.position.latitude;
+      }
+      if (marker.position.longitude > northEastLng) {
+        northEastLng = marker.position.longitude;
+      }
+    });
+
+    return LatLngBounds(
+      southwest: LatLng(southWestLat, southWestLng),
+      northeast: LatLng(northEastLat, northEastLng),
     );
   }
 
@@ -363,7 +564,7 @@ class TrackingPageState extends State<TrackingPage> {
           // print("Curve => ${curveWithLatlng[curveIndex].curve!}");
           if (curveWithLatlng[curveIndex].curve! > 30 && speedOfCar > 80) {
             // ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            showSnackBar80(context);
+            // showSnackBar80(context);
             print("MAX SPEED 100");
           } else if (curveWithLatlng[curveIndex].curve! > 20 &&
               speedOfCar > 90) {
@@ -427,16 +628,6 @@ class TrackingPageState extends State<TrackingPage> {
     });
   }
 
-  void _initGroupView(BuildContext context) async {
-    Navigator.pop(context);
-    _groupPolyline(41.019016, 28.911855, 41.108150, 29.020767);
-    _groupCarMarker();
-    setState(() {
-      groupViewMode = true; // Toggle simulation mode
-    });
-    TempgroupMemberPosition();
-  }
-
   void _TempupdatePositionGroup(LatLng newPosition) async {
     setState(() {
       groupMember = Marker(
@@ -480,6 +671,7 @@ class TrackingPageState extends State<TrackingPage> {
   @override
   void dispose() {
     timer?.cancel();
+    _locationUpdateTimer?.cancel();
     searchController.removeListener(_onSearchChanged);
     searchController.dispose();
 
@@ -677,12 +869,15 @@ class TrackingPageState extends State<TrackingPage> {
     super.initState();
     _getCurrentLocation();
     getLocationUpdates();
+    _startLocationUpdates();
+    _startGroupLocationUpdates();
     searchController.addListener(_onSearchChanged);
 
     _initCarMarker();
     _groupCarMarker();
 
     _fetchAccount();
+    _updateLocation();
   }
 
   @override
@@ -735,25 +930,42 @@ class TrackingPageState extends State<TrackingPage> {
     };
     return Scaffold(
       appBar: AppBar(
+          actions: [
+            Switch(
+              value: groupViewMode,
+              onChanged: (value) {
+                setState(() {
+                  groupViewMode = value;
+                });
+                if (groupViewMode) {
+                  _initGroupView(context);
+                } else {
+                  setState(() {
+                    _markers.clear();
+                  });
+                }
+              },
+            )
+          ],
           title: Row(
-        children: [
-          Expanded(
-              child: TextField(
-            controller: searchController,
-            decoration: InputDecoration(
-                hintText: "Search for places...",
-                border: InputBorder.none,
-                suffixIcon: Icon(Icons.search)),
+            children: [
+              Expanded(
+                  child: TextField(
+                controller: searchController,
+                decoration: InputDecoration(
+                    hintText: "Search for places...",
+                    border: InputBorder.none,
+                    suffixIcon: Icon(Icons.search)),
+              )),
+            ],
           )),
-        ],
-      )),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: <Widget>[
             UserAccountsDrawerHeader(
-              accountName: Text(user?.displayName ?? "User Name"),
-              accountEmail: Text(user?.email ?? "user@example.com"),
+              accountName: Text(account?.name ?? "User Name"),
+              accountEmail: Text(account?.email ?? "user@example.com"),
               currentAccountPicture: CircleAvatar(
                 child: Text(
                   user?.email?.toUpperCase() ??
@@ -765,7 +977,10 @@ class TrackingPageState extends State<TrackingPage> {
             ListTile(
               leading: Icon(Icons.group),
               title: Text("${account?.userId}"),
-              onTap: () => _initGroupView(context)
+              onTap: () {
+                groupViewMode = true;
+                _initGroupView(context);
+              }
               // Navigate to the Group View page
               // Navigator.of(context)
               //     .push(MaterialPageRoute(builder: (context) => GroupView()));
@@ -776,19 +991,16 @@ class TrackingPageState extends State<TrackingPage> {
               title: Text('Profile'),
               onTap: () {
                 // Handle the profile tap
+                Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => ProfilePage()));
               },
             ),
             ListTile(
               leading: Icon(Icons.logout),
-              title: Text('Logout'),
+              title: Text('Invitations'),
               onTap: () {
-                FirebaseAuth.instance.signOut().then((_) {
-                  // This ensures that the navigation is pushed after the build is complete
-                  Future.delayed(Duration.zero, () {
-                    Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (context) => LoginPage()));
-                  });
-                });
+                Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (context) => GroupView()));
               },
             ),
             ListTile(
@@ -884,7 +1096,7 @@ class TrackingPageState extends State<TrackingPage> {
                   },
                   markers: {
                     if (simulationMode == true) carMarker!,
-                    if (groupViewMode == true) groupMember!,
+                    if (groupViewMode == true) ..._markers,
 
                     Marker(
                         markerId: MarkerId("source"),

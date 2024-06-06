@@ -16,14 +16,15 @@ class WelcomePage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Spacer(),
-              Text(
-                'Hello, Welcome!',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
+              Column(
+                children: <Widget>[
+                  Hero(
+                      tag: 'logo',
+                      child: Container(
+                        child: Image.asset('images/logo_dg.png'),
+                        height: 240,
+                      )),
+                ],
               ),
               SizedBox(height: 20),
               Text(

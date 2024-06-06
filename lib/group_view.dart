@@ -1,4 +1,5 @@
 import 'package:drive_guide/group_tracking.dart';
+import 'package:drive_guide/tracking.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,12 +16,14 @@ class _GroupViewState extends State<GroupView> {
   final TextEditingController _inviteeController = TextEditingController();
 
   List<Invitation> _invitations = [];
+  List<Map<String, dynamic>> _groupMembers = [];
 
   @override
   void initState() {
     super.initState();
     _fetchInvitations();
     _listenToInvitationUpdates();
+    _fetchGroupMembers();
   }
 
   void _fetchInvitations() async {
@@ -70,27 +73,75 @@ class _GroupViewState extends State<GroupView> {
   void _updateInvitationStatus(Invitation invitation, String status) async {
     if (status == 'declined') {
       // Delete the invitation from Firestore
-      await _firestore
+      var snapshot = await _firestore
           .collection('invitations')
-          .doc(invitation.inviterId)
-          .delete();
+          .where('inviterId', isEqualTo: invitation.inviterId)
+          .where('inviteeId', isEqualTo: invitation.inviteeId)
+          .get();
+
+      for (var doc in snapshot.docs) {
+        await doc.reference.delete();
+      }
       // Update the UI
       _fetchInvitations();
     } else if (status == 'accepted') {
       // Show confirmation dialog
       bool confirm = await _showConfirmationDialog();
       if (confirm) {
-        // Navigate to map page
-        // Navigator.push(
-        //   context,
-        //   MaterialPageRoute(
-        //       builder: (context) => GroupTrackingPage(
-        //           currentUser: _auth.currentUser,
-        //           friendUser: invitation.inviterId)),
-        // );
+        await _addToGroup(invitation);
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => TrackingPage(user: _auth.currentUser!)));
       } else {
         // Do nothing if they choose 'No'
         print("Invitation acceptance cancelled.");
+      }
+    }
+  }
+
+  Future<void> _addToGroup(Invitation invitation) async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      var currentUserSnapshot = await _firestore
+          .collection('Account')
+          .where('userId', isEqualTo: currentUser.uid)
+          .get();
+
+      var inviterSnapshot = await _firestore
+          .collection('Account')
+          .where('userId', isEqualTo: invitation.inviterId)
+          .get();
+
+      if (currentUserSnapshot.docs.isNotEmpty &&
+          inviterSnapshot.docs.isNotEmpty) {
+        var currentUserDoc = currentUserSnapshot.docs.first;
+        var inviterDoc = inviterSnapshot.docs.first;
+
+        var currentUserLocation = currentUserDoc['location'];
+        var inviterLocation = inviterDoc['location'];
+
+        var currentUserGroupWith =
+            currentUserDoc['groupWith'] as List<dynamic>? ?? [];
+        var inviterGroupWith = inviterDoc['groupWith'] as List<dynamic>? ?? [];
+
+        currentUserGroupWith.add({
+          'userId': invitation.inviterId,
+          'location': inviterLocation,
+        });
+
+        inviterGroupWith.add({
+          'userId': currentUser.uid,
+          'location': currentUserLocation,
+        });
+
+        await _firestore.collection('Account').doc(currentUserDoc.id).update({
+          'groupWith': currentUserGroupWith,
+        });
+
+        await _firestore.collection('Account').doc(inviterDoc.id).update({
+          'groupWith': inviterGroupWith,
+        });
       }
     }
   }
@@ -122,6 +173,37 @@ class _GroupViewState extends State<GroupView> {
         );
       },
     );
+  }
+
+  void _fetchGroupMembers() async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      var snapshot = await _firestore
+          .collection('Account')
+          .where('userId', isEqualTo: currentUser.uid)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        var userDoc = snapshot.docs.first;
+        var groupWithList = userDoc['groupWith'] as List<dynamic>? ?? [];
+        List<Map<String, dynamic>> groupMembers = [];
+
+        for (var groupMember in groupWithList) {
+          var memberSnapshot = await _firestore
+              .collection('Account')
+              .where('userId', isEqualTo: groupMember['userId'])
+              .get();
+
+          if (memberSnapshot.docs.isNotEmpty) {
+            groupMembers.add(memberSnapshot.docs.first.data());
+          }
+        }
+
+        setState(() {
+          _groupMembers = groupMembers;
+        });
+      }
+    }
   }
 
   void _listenToInvitationUpdates() {
@@ -164,31 +246,50 @@ class _GroupViewState extends State<GroupView> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: _invitations.length,
-              itemBuilder: (context, index) {
-                Invitation invitation = _invitations[index];
-                return ListTile(
-                  title: Text("Invitation from ${invitation.inviterId}"),
-                  subtitle:
-                      Text("Received on ${invitation.timestamp.toDate()}"),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.check),
-                        onPressed: () =>
-                            _updateInvitationStatus(invitation, 'accepted'),
+            child: ListView(
+              children: [
+                ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _invitations.length,
+                  itemBuilder: (context, index) {
+                    Invitation invitation = _invitations[index];
+                    return ListTile(
+                      title: Text("Invitation from ${invitation.inviterId}"),
+                      subtitle:
+                          Text("Received on ${invitation.timestamp.toDate()}"),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.check),
+                            onPressed: () =>
+                                _updateInvitationStatus(invitation, 'accepted'),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close),
+                            onPressed: () =>
+                                _updateInvitationStatus(invitation, 'declined'),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: Icon(Icons.close),
-                        onPressed: () =>
-                            _updateInvitationStatus(invitation, 'declined'),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+                Divider(),
+                Text('Current Group Members',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _groupMembers.length,
+                  itemBuilder: (context, index) {
+                    var member = _groupMembers[index];
+                    return ListTile(
+                      title: Text('Name: ${member['name']}'),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         ],

@@ -69,6 +69,12 @@ class _SignUpPageState extends State<SignUpPage> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
+              Hero(
+                  tag: 'logo',
+                  child: Container(
+                    height: 120,
+                    child: Image.asset('images/logo_dg.png'),
+                  )),
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
