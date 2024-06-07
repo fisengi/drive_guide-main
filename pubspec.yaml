@@ -53,6 +53,8 @@ dependencies:
     google_sign_in: ^6.2.1
     firebase_storage: ^11.6.9
     image_picker: ^1.0.8
+    flutter_ringtone_player: ^4.0.0+3
+    flutter_beep: ^1.0.0
 
 dev_dependencies:
     flutter_test:

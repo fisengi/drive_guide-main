@@ -12,6 +12,8 @@ import 'package:flutter_google_places/flutter_google_places.dart';
 import 'package:google_maps_webservice/places.dart' as gmaps;
 
 import 'dart:math';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'package:flutter_beep/flutter_beep.dart';
 //keep all member in the view, yavaşsa detaylı hızlıysa biraz daha detaysız göster. yakın curveleri tek circleda göster. curvelerin sıklığına göre derecesi değişiyor. curvelerde uyarı zamanı hıza göre değişecek
 // hızların sağ üste ekle hız sınırı viraj keskinliği rakamsal olarak Sesli uyarı. Redis grup view. Group sesli konuşma. Chat view
 
@@ -116,6 +118,7 @@ class TrackingPageState extends State<TrackingPage> {
 
   double distanceToCurve = double.infinity;
   int curveIndex = 0;
+  Color warningColor = forColors.Colors.green;
 
   Future<void> loadLatlngToCurves(
       List<LatLng> polylineCoordinates, List<double> curves) async {
@@ -552,37 +555,49 @@ class TrackingPageState extends State<TrackingPage> {
     if (temp > distanceToCurve && curveIndex < curveWithLatlng.length) {
       curveIndex++;
       distanceToCurve = double.infinity;
-      // print("curve index arttı");
-      // print("temp büyük");
     } else {
-      // print("temp küçük");
-      // print("distance to curve => ${distanceToCurve}");
       if (temp < distanceToCurve) {
         distanceToCurve = temp;
-        // print(distanceToCurve);
         if (distanceToCurve < 200) {
-          // print("Curve => ${curveWithLatlng[curveIndex].curve!}");
-          if (curveWithLatlng[curveIndex].curve! > 30 && speedOfCar > 80) {
-            // ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            // showSnackBar80(context);
-            print("MAX SPEED 100");
-          } else if (curveWithLatlng[curveIndex].curve! > 20 &&
-              speedOfCar > 90) {
-            // ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            showSnackBar90(context);
-            print("MAX SPEED 90");
-          } else if (curveWithLatlng[curveIndex].curve! > 10 &&
-              speedOfCar > 100) {
-            // ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            showSnackBar100(context);
-            print("MAX SPEED 80");
-          }
+          checkSpeedAndCurve(speedOfCar);
         }
       }
     }
   }
 
-// Optionally, add a method or listener to change the timer interval
+  void checkSpeedAndCurve(int speedOfCar) {
+    var curve = curveWithLatlng[curveIndex].curve!;
+    if (speedOfCar < 80 && warningColor != forColors.Colors.green ||
+        (curve < 10 && warningColor != forColors.Colors.green)) {
+      warningColor = forColors.Colors.green;
+    } else if (curve > 30 &&
+        speedOfCar > 80 &&
+        warningColor != forColors.Colors.yellow) {
+      if (warningColor != forColors.Colors.yellow) {
+        warningColor = forColors.Colors.yellow;
+      }
+
+      FlutterBeep.beep();
+      // FlutterBeep.playSysSound(iOSSoundIDs.AudioToneBusy);
+      print("MAX SPEED 100");
+    } else if (curve > 20 &&
+        speedOfCar > 90 &&
+        warningColor != forColors.Colors.orange) {
+      if (warningColor != forColors.Colors.orange) {
+        warningColor = forColors.Colors.orange;
+      }
+
+      FlutterBeep.beep();
+      // FlutterBeep.playSysSound(iOSSoundIDs.AudioToneBusy);
+    } else if (curve > 10 && speedOfCar > 100) {
+      if (warningColor != forColors.Colors.red) {
+        warningColor = forColors.Colors.red;
+      }
+      FlutterBeep.beep();
+      // FlutterBeep.playSysSound(iOSSoundIDs.AudioToneBusy);
+    }
+  }
+
 // when speedSliderValue changes.
   void onSpeedSliderValueChanged(double value) {
     startOrRestartTimer(lastRouteIndex + 1, distanceToCurve,
@@ -626,39 +641,6 @@ class TrackingPageState extends State<TrackingPage> {
         groupMemberIcon = icon;
       });
     });
-  }
-
-  void _TempupdatePositionGroup(LatLng newPosition) async {
-    setState(() {
-      groupMember = Marker(
-        markerId: MarkerId("groupMember"),
-        position: newPosition,
-        icon: groupMemberIcon,
-      );
-    });
-  }
-
-  void TempgroupMemberPosition() {
-    timer?.cancel(); // Cancel any existing timer.
-    int index = 0; // Reset the route index.
-
-    // Calculate the time interval based on the current speed slider value.
-
-    // Start a new timer with the newly calculated interval.
-    timer = Timer.periodic(Duration(milliseconds: 300), (Timer t) {
-      if (index < groupPolyLineCoordinates.length && groupViewMode == true) {
-        _TempupdatePositionGroup(groupPolyLineCoordinates[index]);
-
-        index++;
-      } else {
-        t.cancel();
-        print(" Group Member Reached destination");
-      }
-    });
-  }
-
-  void _onCameraMove(CameraPosition position) {
-    // print('The current zoom level is: ${position.zoom}');
   }
 
   TextEditingController searchController = TextEditingController();
@@ -729,12 +711,30 @@ class TrackingPageState extends State<TrackingPage> {
                     _getPolyline(currentLocation!.latitude!,
                         currentLocation!.longitude!, lat, lng);
                   } else {
-                    print("polyline çizemiyyor");
+                    print("Can Not Draw Polyline");
                   }
                 },
               );
             },
           );
+  }
+
+  Widget buildSpeedWarner() {
+    return Container(
+      width: 100, // Set the width of the SizedBox
+      height: 100,
+      color: forColors.Colors.red, // Set the height of the SizedBox
+      child: Center(
+        // Display the number
+        child: Text(
+          '$speedSliderValue',
+          style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: forColors.Colors.black),
+        ),
+      ),
+    );
   }
 
   void _searchPlace(String input) async {
@@ -781,7 +781,6 @@ class TrackingPageState extends State<TrackingPage> {
           _currentP =
               LatLng(currentLocation.latitude!, currentLocation.longitude!);
           print(_currentP);
-          print("köksal");
         });
       }
     });
@@ -869,8 +868,8 @@ class TrackingPageState extends State<TrackingPage> {
     super.initState();
     _getCurrentLocation();
     getLocationUpdates();
-    _startLocationUpdates();
-    _startGroupLocationUpdates();
+    // _startLocationUpdates();
+    // _startGroupLocationUpdates();
     searchController.addListener(_onSearchChanged);
 
     _initCarMarker();
@@ -883,6 +882,7 @@ class TrackingPageState extends State<TrackingPage> {
   @override
   Widget build(BuildContext context) {
     _buildPlacesList();
+    buildSpeedWarner();
 
     if (destination != null) {
       curves = calculateTurnAngle(
@@ -929,36 +929,59 @@ class TrackingPageState extends State<TrackingPage> {
       // allCircles = calculateTurnAngleZoomOut(polylineCoordinates);
     };
     return Scaffold(
-      appBar: AppBar(
-          actions: [
-            Switch(
-              value: groupViewMode,
-              onChanged: (value) {
-                setState(() {
-                  groupViewMode = value;
-                });
-                if (groupViewMode) {
-                  _initGroupView(context);
-                } else {
-                  setState(() {
-                    _markers.clear();
-                  });
-                }
-              },
-            )
-          ],
-          title: Row(
-            children: [
-              Expanded(
-                  child: TextField(
-                controller: searchController,
-                decoration: InputDecoration(
-                    hintText: "Search for places...",
-                    border: InputBorder.none,
-                    suffixIcon: Icon(Icons.search)),
+      appBar: simulationMode && destination != null
+          ? AppBar(
+              title: Container(
+              width: 100, // Set the width of the SizedBox
+              height: 100,
+
+              decoration: BoxDecoration(
+                color:
+                    warningColor, // Set the background color of the Container
+                borderRadius:
+                    BorderRadius.circular(50), // Set the border radius
+              ),
+              child: Center(
+                // Display the number
+                child: Text(
+                  '$speedSliderValue',
+                  style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: forColors.Colors.white),
+                ),
+              ),
+            ))
+          : AppBar(
+              actions: [
+                  Switch(
+                    value: groupViewMode,
+                    onChanged: (value) {
+                      setState(() {
+                        groupViewMode = value;
+                      });
+                      if (groupViewMode) {
+                        _initGroupView(context);
+                      } else {
+                        setState(() {
+                          _markers.clear();
+                        });
+                      }
+                    },
+                  )
+                ],
+              title: Row(
+                children: [
+                  Expanded(
+                      child: TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                        hintText: "Search for places...",
+                        border: InputBorder.none,
+                        suffixIcon: Icon(Icons.search)),
+                  )),
+                ],
               )),
-            ],
-          )),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -1025,7 +1048,7 @@ class TrackingPageState extends State<TrackingPage> {
                   onMapCreated: (GoogleMapController controller) {
                     _controller.complete(controller);
                   },
-                  onCameraMove: _onCameraMove,
+
                   circles: circlesss,
 
                   // circles: Set.from(redcircles
@@ -1160,14 +1183,14 @@ class TrackingPageState extends State<TrackingPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: <Widget>[
                             _buildActionButton(
-                                context, Icons.camera_indoor, 'GROUP VİEW AÇ',
+                                context, Icons.camera_indoor, 'Open group view',
                                 () {
                               if (groupView == "closed") {
                                 groupViewOpened();
                               } else {}
                             }),
                             _buildActionButton(context, Icons.camera_outdoor,
-                                'GROUP VİEW KAPA', () {}),
+                                'Close group view', () {}),
                           ],
                         ),
                       ),
