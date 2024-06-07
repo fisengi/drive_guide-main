@@ -1,8 +1,12 @@
 library roadCurveAlgorithm;
 
 import 'dart:math';
+import 'package:drive_guide/simulationFunctions.dart';
+import 'package:flutter_beep/flutter_beep.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'globals.dart';
+import 'package:flutter/src/material/colors.dart' as forColors;
 
 double degreesToRadians(degrees) {
   return degrees * pi / 180;
@@ -25,17 +29,10 @@ double radiansToDegrees(double radians) {
   return radians * 180 / pi;
 }
 
-List<double> calculateTurnAngle(
-    List<LatLng> polypoints,
-    List<List<LatLng>> redPolyline,
-    List<List<LatLng>> orangePolyline,
-    List<List<LatLng>> bluePolyline,
-    List<LatLng> redcircles,
-    List<LatLng> orangecircles) {
+List<double> calculateTurnAngle(List<LatLng> polypoints,
+    List<LatLng> redcircles, List<LatLng> orangecircles) {
   List<double> curves = [];
-  redPolyline.clear();
-  orangePolyline.clear();
-  bluePolyline.clear();
+
   redcircles.clear();
   orangecircles.clear();
 
@@ -68,14 +65,10 @@ List<double> calculateTurnAngle(
       }
     }
     if (turnAngle > 40) {
-      redPolyline.add([polypoints[i], polypoints[i + 1]]);
       redcircles.add(polypoints[i + 1]);
     } else if (turnAngle < 40 && turnAngle > 20) {
-      orangePolyline.add([polypoints[i], polypoints[i + 1]]);
       orangecircles.add(polypoints[i + 1]);
-    } else {
-      bluePolyline.add([polypoints[i], polypoints[i + 1]]);
-    }
+    } else {}
     curves.add(turnAngle);
   }
 
@@ -197,66 +190,77 @@ List<ZoomOutTurnAngle> checkForDistanceInCircles(
   return circles;
 }
 
-double calculateHaversineDistance(lat1, lon1, lat2, lon2) {
-  var R = 6371e3; // meters
-  var phi1 = degreesToRadians(lat1);
-  var phi2 = degreesToRadians(lat2);
-  var deltaPhi = degreesToRadians(lat2 - lat1);
-  var deltaLambda = degreesToRadians(lon2 - lon1);
+Future<void> loadLatlngToCurves(
+    List<LatLng> polylineCoordinates, List<double> curves) async {
+  curveWithLatlng.clear();
 
-  var a = sin(deltaPhi / 2) * sin(deltaPhi / 2) +
-      cos(phi1) * cos(phi2) * sin(deltaLambda / 2) * sin(deltaLambda / 2);
-  var c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-  return R * c;
+  for (int i = 0; i < curves.length; i++) {
+    curveWithLatlng.add(curveAndLatlng(curves[i], polylineCoordinates[i + 1]));
+  }
 }
 
-void findRadius(List<LatLng> markers) {
-  var sumLat = 0.0;
-  var sumLon = 0.0;
+void loadRouteSimulation(List<LatLng> coordinates) {
+  simulationCoordinates.clear();
 
-  for (var marker in markers) {
-    sumLat += marker.latitude;
-    sumLon += marker.longitude;
+  for (int i = 0; i < coordinates.length - 1; i++) {
+    simulationCoordinates
+        .addAll(interpolatePoints(coordinates[i], coordinates[i + 1], 1));
   }
 
-  var centroidLat = sumLat / markers.length;
-  var centroidLon = sumLon / markers.length;
+  for (int i = 0; i < simulationCoordinates.length - 1; i++) {
+    if (simulationCoordinates[i] == simulationCoordinates[i + 1])
+      simulationCoordinates.removeAt(i);
+  }
+}
 
-  double maxDistance = 0;
-  for (var marker in markers) {
-    double distance = calculateHaversineDistance(
-      centroidLat,
-      centroidLon,
-      marker.latitude,
-      marker.longitude,
-    );
-    if (distance > maxDistance) {
-      maxDistance = distance;
+void speedControl(LatLng coordinatOfCar, int speedOfCar) {
+  double temp = Geolocator.distanceBetween(
+    coordinatOfCar.latitude,
+    coordinatOfCar.longitude,
+    curveWithLatlng[curveIndex].coordination!.latitude,
+    curveWithLatlng[curveIndex].coordination!.longitude,
+  );
+
+  if (temp > distanceToCurve && curveIndex < curveWithLatlng.length) {
+    curveIndex++;
+    distanceToCurve = double.infinity;
+  } else {
+    if (temp < distanceToCurve) {
+      distanceToCurve = temp;
+      if (distanceToCurve < 200) {
+        checkSpeedAndCurve(speedOfCar);
+      }
     }
   }
-
-  // print("Inner radius is: $maxDistance meters");
 }
 
-double calculatePolylineLength(List<LatLng> polylinePoints) {
-  double totalDistance = 0.0;
+void checkSpeedAndCurve(int speedOfCar) {
+  var curve = curveWithLatlng[curveIndex].curve!;
+  if (speedOfCar < 80 && warningColor != forColors.Colors.green ||
+      (curve < 10 && warningColor != forColors.Colors.green)) {
+    warningColor = forColors.Colors.green;
+  } else if (curve > 30 &&
+      speedOfCar > 80 &&
+      warningColor != forColors.Colors.yellow) {
+    if (warningColor != forColors.Colors.yellow) {
+      warningColor = forColors.Colors.yellow;
+    }
 
-  for (int i = 0; i < polylinePoints.length - 1; i++) {
-    final start = polylinePoints[i];
+    FlutterBeep.beep();
 
-    final end = polylinePoints[i + 1];
+    print("MAX SPEED 100");
+  } else if (curve > 20 &&
+      speedOfCar > 90 &&
+      warningColor != forColors.Colors.orange) {
+    if (warningColor != forColors.Colors.orange) {
+      warningColor = forColors.Colors.orange;
+    }
 
-    // Calculate the distance between the current point and the next point
-    double distance = Geolocator.distanceBetween(
-      start.latitude,
-      start.longitude,
-      end.latitude,
-      end.longitude,
-    );
-
-    totalDistance += distance;
+    FlutterBeep.beep();
+  } else if (curve > 10 && speedOfCar > 100) {
+    if (warningColor != forColors.Colors.red) {
+      warningColor = forColors.Colors.red;
+    }
+    FlutterBeep.beep();
   }
-
-  return totalDistance;
 }

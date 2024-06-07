@@ -12,7 +12,7 @@ import 'package:flutter_google_places/flutter_google_places.dart';
 import 'package:google_maps_webservice/places.dart' as gmaps;
 
 import 'dart:math';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+
 import 'package:flutter_beep/flutter_beep.dart';
 //keep all member in the view, yavaşsa detaylı hızlıysa biraz daha detaysız göster. yakın curveleri tek circleda göster. curvelerin sıklığına göre derecesi değişiyor. curvelerde uyarı zamanı hıza göre değişecek
 // hızların sağ üste ekle hız sınırı viraj keskinliği rakamsal olarak Sesli uyarı. Redis grup view. Group sesli konuşma. Chat view
@@ -33,23 +33,6 @@ import 'roadCurveAlgorithm.dart';
 import 'simulationFunctions.dart';
 import 'globals.dart';
 
-import 'package:fluttertoast/fluttertoast.dart';
-
-class kullanici {
-  int? speed;
-  LatLng? coordination;
-}
-
-class curveAndLatlng {
-  double? curve;
-  LatLng? coordination;
-
-  curveAndLatlng(double curv, LatLng polylineCoordinat) {
-    curve = curv;
-    coordination = polylineCoordinat;
-  }
-}
-
 class TrackingPage extends StatefulWidget {
   final User user;
 
@@ -62,73 +45,24 @@ class TrackingPage extends StatefulWidget {
 class TrackingPageState extends State<TrackingPage> {
   final Completer<GoogleMapController> _controller = Completer();
 
+  User? user = FirebaseAuth.instance.currentUser;
+  Account? account;
+
+  bool showPlacesList = true;
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   static const LatLng sourceLocation = LatLng(41.113953, 29.013857);
-
   static const LatLng groupLocationfirst = LatLng(41.108150, 29.020767);
-
-  final Set<Marker> _markersForDistanceCamera = {};
-
   LocationData? currentLocation;
   Location location = Location();
-
-  List<curveAndLatlng> curveWithLatlng = [];
-
   LatLng? destination = null;
-
-  List<LatLng> polylineCoordinates = [];
-  List<LatLng> groupPolyLineCoordinates = [];
-  List<List<LatLng>> redPolylineCoordinates = [];
-  List<List<LatLng>> bluePolylineCoordinates = [];
-
-  List<List<LatLng>> orangePolylineCoordinates = [];
-
-  List<LatLng> redcircles = [];
-  List<LatLng> orangecircles = [];
-  List<ZoomOutTurnAngle> allCircles = [];
-
-  List<double> curves = [];
-
+  final Set<Marker> _markers = {};
   Location _locationController = new Location();
-
   LatLng? _currentP = null;
 
-  User? user = FirebaseAuth.instance.currentUser;
-  bool showPlacesList = true;
-
-  Marker? carMarker;
-  Marker? groupMember;
-
-  Timer? timer;
   Timer? _locationUpdateTimer;
   Timer? _groupLocationUpdateTimer;
-  List<LatLng> simulationCoordinates = [];
-
-  bool simulationMode = false;
-  bool isStopped = false;
-  int simulationSpeed = 60;
-  final Set<Marker> _markers = {};
-  bool groupViewMode = false;
-  String groupView = 'closed';
-  BitmapDescriptor carIcon = BitmapDescriptor.defaultMarker;
-  BitmapDescriptor groupMemberIcon = BitmapDescriptor.defaultMarker;
-
-  Account? account;
-
-  double distanceToCurve = double.infinity;
-  int curveIndex = 0;
-  Color warningColor = forColors.Colors.green;
-
-  Future<void> loadLatlngToCurves(
-      List<LatLng> polylineCoordinates, List<double> curves) async {
-    curveWithLatlng.clear();
-
-    for (int i = 0; i < curves.length; i++) {
-      curveWithLatlng
-          .add(curveAndLatlng(curves[i], polylineCoordinates[i + 1]));
-    }
-  }
 
   void _fetchAccount() async {
     // print("FETCHING ACCOUNT");
@@ -142,11 +76,10 @@ class TrackingPageState extends State<TrackingPage> {
 
         // Check if an account is found
         if (snapshot.docs.isNotEmpty) {
-          print("alskjdlkjsdkla");
           var doc = snapshot.docs.first;
-          print(doc.data());
+
           var accountData = doc.data();
-          print("asdasdasdlaskdasd");
+
           print(accountData);
           setState(() {
             //burada accounta eşitlenmeli
@@ -287,20 +220,6 @@ class TrackingPageState extends State<TrackingPage> {
     _groupLocationUpdateTimer = Timer.periodic(Duration(seconds: 10), (timer) {
       _updateGroupLocations();
     });
-  }
-
-  void loadRouteSimulation(List<LatLng> coordinates) {
-    simulationCoordinates.clear();
-
-    for (int i = 0; i < coordinates.length - 1; i++) {
-      simulationCoordinates
-          .addAll(interpolatePoints(coordinates[i], coordinates[i + 1], 1));
-    }
-
-    for (int i = 0; i < simulationCoordinates.length - 1; i++) {
-      if (simulationCoordinates[i] == simulationCoordinates[i + 1])
-        simulationCoordinates.removeAt(i);
-    }
   }
 
   void addCustomIcon() {
@@ -473,7 +392,7 @@ class TrackingPageState extends State<TrackingPage> {
               simulationCoordinates[startIndex], speedSliderValue.round());
         }
 
-        _updatePosition(simulationCoordinates[startIndex]);
+        updatePosition(simulationCoordinates[startIndex]);
         lastRouteIndex = startIndex; // Update the last position of routeIndex
         startIndex++;
       } else {
@@ -483,128 +402,13 @@ class TrackingPageState extends State<TrackingPage> {
     });
   }
 
-  // void showToast(String message) {
-  //   Future.delayed(Duration.zero, () {
-  //     Fluttertoast.showToast(
-  //         msg: message,
-  //         toastLength: Toast.LENGTH_SHORT,
-  //         gravity: ToastGravity.TOP,
-  //         timeInSecForIosWeb: 1,
-  //         backgroundColor: forColors.Colors.grey[900],
-  //         textColor: forColors.Colors.white,
-  //         fontSize: 16.0);
-  //   });
-  // }
-
-  showSnackBar100(context) {
-    SnackBar snackBar = SnackBar(
-      content: const Text('Max Speed 100', style: TextStyle(fontSize: 20)),
-      backgroundColor: forColors.Colors.green,
-      dismissDirection: DismissDirection.up,
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 2),
-      margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).size.height - 150,
-          left: 10,
-          right: 10),
-    );
-
-    ScaffoldMessenger.of(context).showSnackBar(snackBar);
-  }
-
-  showSnackBar90(context) {
-    SnackBar snackBar = SnackBar(
-      content: const Text('Max Speed 90', style: TextStyle(fontSize: 20)),
-      backgroundColor: forColors.Colors.orange,
-      dismissDirection: DismissDirection.up,
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 2),
-      margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).size.height - 150,
-          left: 10,
-          right: 10),
-    );
-
-    ScaffoldMessenger.of(context).showSnackBar(snackBar);
-  }
-
-  showSnackBar80(context) {
-    SnackBar snackBar = SnackBar(
-      content: const Text('Max Speed 80', style: TextStyle(fontSize: 20)),
-      backgroundColor: forColors.Colors.red,
-      dismissDirection: DismissDirection.up,
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 2),
-      margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).size.height - 150,
-          left: 10,
-          right: 10),
-    );
-
-    ScaffoldMessenger.of(context).showSnackBar(snackBar);
-  }
-
-  void speedControl(LatLng coordinatOfCar, int speedOfCar) {
-    double temp = Geolocator.distanceBetween(
-      coordinatOfCar.latitude,
-      coordinatOfCar.longitude,
-      curveWithLatlng[curveIndex].coordination!.latitude,
-      curveWithLatlng[curveIndex].coordination!.longitude,
-    );
-
-    if (temp > distanceToCurve && curveIndex < curveWithLatlng.length) {
-      curveIndex++;
-      distanceToCurve = double.infinity;
-    } else {
-      if (temp < distanceToCurve) {
-        distanceToCurve = temp;
-        if (distanceToCurve < 200) {
-          checkSpeedAndCurve(speedOfCar);
-        }
-      }
-    }
-  }
-
-  void checkSpeedAndCurve(int speedOfCar) {
-    var curve = curveWithLatlng[curveIndex].curve!;
-    if (speedOfCar < 80 && warningColor != forColors.Colors.green ||
-        (curve < 10 && warningColor != forColors.Colors.green)) {
-      warningColor = forColors.Colors.green;
-    } else if (curve > 30 &&
-        speedOfCar > 80 &&
-        warningColor != forColors.Colors.yellow) {
-      if (warningColor != forColors.Colors.yellow) {
-        warningColor = forColors.Colors.yellow;
-      }
-
-      FlutterBeep.beep();
-      // FlutterBeep.playSysSound(iOSSoundIDs.AudioToneBusy);
-      print("MAX SPEED 100");
-    } else if (curve > 20 &&
-        speedOfCar > 90 &&
-        warningColor != forColors.Colors.orange) {
-      if (warningColor != forColors.Colors.orange) {
-        warningColor = forColors.Colors.orange;
-      }
-
-      FlutterBeep.beep();
-      // FlutterBeep.playSysSound(iOSSoundIDs.AudioToneBusy);
-    } else if (curve > 10 && speedOfCar > 100) {
-      if (warningColor != forColors.Colors.red) {
-        warningColor = forColors.Colors.red;
-      }
-      FlutterBeep.beep();
-      // FlutterBeep.playSysSound(iOSSoundIDs.AudioToneBusy);
-    }
-  }
-
 // when speedSliderValue changes.
   void onSpeedSliderValueChanged(double value) {
     startOrRestartTimer(lastRouteIndex + 1, distanceToCurve,
         curveIndex); // Restart the timer with new interval.
   }
 
-  void _updatePosition(LatLng newPosition) async {
+  void updatePosition(LatLng newPosition) async {
     final GoogleMapController controller = await _controller.future;
     controller.animateCamera(CameraUpdate.newLatLng(newPosition));
     setState(() {
@@ -804,23 +608,6 @@ class TrackingPageState extends State<TrackingPage> {
     }
   }
 
-  void _groupPolyline(
-      double startLat, double startLng, double destLat, double destLng) async {
-    PolylinePoints groupPolylinePoints = PolylinePoints();
-    PolylineResult groupResult =
-        await groupPolylinePoints.getRouteBetweenCoordinates(
-      google_api_key,
-      PointLatLng(startLat, startLng),
-      PointLatLng(destLat, destLng),
-    );
-
-    if (groupResult.points.isNotEmpty) {
-      groupPolyLineCoordinates.clear();
-      groupResult.points.forEach((PointLatLng point) => groupPolyLineCoordinates
-          .add(LatLng(point.latitude, point.longitude)));
-    }
-  }
-
   void groupViewOpened() async {
     final GoogleMapController controller = await _controller.future;
     animateCameraToMidpoint(controller, groupMember!.position, sourceLocation);
@@ -885,24 +672,12 @@ class TrackingPageState extends State<TrackingPage> {
     buildSpeedWarner();
 
     if (destination != null) {
-      curves = calculateTurnAngle(
-          polylineCoordinates,
-          redPolylineCoordinates,
-          orangePolylineCoordinates,
-          bluePolylineCoordinates,
-          redcircles,
-          orangecircles);
+      curves =
+          calculateTurnAngle(polylineCoordinates, redcircles, orangecircles);
 
-      // print("INNER RADIUS");
-      // findRadius(polylineCoordinates);
       loadLatlngToCurves(polylineCoordinates, curves);
 
-      // print(curves);
-      // print("curves length =>${curves.length} ");
-      // print("polyline lenght => ${polylineCoordinates.length}");
-
       allCircles = calculateTurnAngleZoomOut(polylineCoordinates);
-      // print("after that");
     }
 
     Set<Circle> circlesss = {
@@ -932,17 +707,13 @@ class TrackingPageState extends State<TrackingPage> {
       appBar: simulationMode && destination != null
           ? AppBar(
               title: Container(
-              width: 100, // Set the width of the SizedBox
+              width: 100,
               height: 100,
-
               decoration: BoxDecoration(
-                color:
-                    warningColor, // Set the background color of the Container
-                borderRadius:
-                    BorderRadius.circular(50), // Set the border radius
+                color: warningColor,
+                borderRadius: BorderRadius.circular(50),
               ),
               child: Center(
-                // Display the number
                 child: Text(
                   '$speedSliderValue',
                   style: TextStyle(
@@ -991,8 +762,7 @@ class TrackingPageState extends State<TrackingPage> {
               accountEmail: Text(account?.email ?? "user@example.com"),
               currentAccountPicture: CircleAvatar(
                 child: Text(
-                  user?.email?.toUpperCase() ??
-                      "U", // For simplicity, just the first letter of the name
+                  user?.email?.toUpperCase() ?? "U",
                   style: TextStyle(fontSize: 40.0),
                 ),
               ),
@@ -1044,39 +814,10 @@ class TrackingPageState extends State<TrackingPage> {
                   initialCameraPosition:
                       CameraPosition(target: sourceLocation, zoom: 15),
                   myLocationEnabled: true,
-
                   onMapCreated: (GoogleMapController controller) {
                     _controller.complete(controller);
                   },
-
                   circles: circlesss,
-
-                  // circles: Set.from(redcircles
-                  //     .map(
-                  //       (point) => Circle(
-                  //         circleId: CircleId('red_${point.toString()}'),
-                  //         center: point,
-                  //         radius: 20,
-                  //         fillColor: forColors.Colors.red.withOpacity(0.5),
-                  //         strokeColor: forColors.Colors.red,
-                  //         strokeWidth: 2,
-                  //       ),
-                  //     )
-                  //     .toList())
-                  //   ..addAll(orangecircles
-                  //       .map(
-                  //         (point) => Circle(
-                  //           circleId: CircleId('orange_${point.toString()}'),
-                  //           center: point,
-                  //           radius: 20,
-                  //           fillColor:
-                  //               forColors.Colors.orange.withOpacity(0.5),
-                  //           strokeColor: forColors.Colors.orange,
-                  //           strokeWidth: 2,
-                  //         ),
-                  //       )
-                  //       .toList()),
-
                   polylines: {
                     if (polylineCoordinates.isNotEmpty)
                       Polyline(
@@ -1085,42 +826,10 @@ class TrackingPageState extends State<TrackingPage> {
                         color: forColors.Colors.blue,
                         width: 6,
                       ),
-                    // if (redPolylineCoordinates.isNotEmpty)
-                    //   for (int i = 0; i < redPolylineCoordinates.length; i++)
-                    //     Polyline(
-                    //       polylineId: PolylineId("red${i}"),
-                    //       points: redPolylineCoordinates[i],
-                    //       color: forColors.Colors.red,
-                    //       width: 6,
-                    //     ),
-                    // if (bluePolylineCoordinates.isNotEmpty)
-                    //   for (int i = 0; i < bluePolylineCoordinates.length; i++)
-                    //     Polyline(
-                    //       polylineId: PolylineId("blue${i}"),
-                    //       points: bluePolylineCoordinates[i],
-                    //       color: forColors.Colors.blue,
-                    //       width: 6,
-                    //     ),
-                    // if (orangePolylineCoordinates.isNotEmpty)
-                    //   for (int i = 0; i < orangePolylineCoordinates.length; i++)
-                    //     Polyline(
-                    //       polylineId: PolylineId("orange${i}"),
-                    //       points: orangePolylineCoordinates[i],
-                    //       color: forColors.Colors.orange,
-                    //       width: 6,
-                    //     ),
-                    // if (groupPolyLineCoordinates.isNotEmpty)
-                    //   Polyline(
-                    //     polylineId: PolylineId("group"),
-                    //     points: groupPolyLineCoordinates,
-                    //     color: forColors.Colors.purple,
-                    //     width: 6,
-                    //   ),
                   },
                   markers: {
                     if (simulationMode == true) carMarker!,
                     if (groupViewMode == true) ..._markers,
-
                     Marker(
                         markerId: MarkerId("source"),
                         position: sourceLocation,
@@ -1131,23 +840,6 @@ class TrackingPageState extends State<TrackingPage> {
                         position: LatLng(
                             destination!.latitude, destination!.longitude),
                       ),
-
-                    // if (polylineCoordinates.isNotEmpty)
-                    //   for (int i = 0; i < polylineCoordinates.length; i++)
-                    //     if (i >= 1 && i <= polylineCoordinates.length - 2)
-                    //       Marker(
-                    //           markerId: MarkerId("redpoly${i}"),
-                    //           position: polylineCoordinates[i],
-                    //           infoWindow: InfoWindow(
-                    //             title: "Curve ${i - 1} => ${curves[i - 1]}",
-                    //           ))
-                    //     else
-                    //       Marker(
-                    //           markerId: MarkerId("redpoly${i}"),
-                    //           position: polylineCoordinates[i],
-                    //           infoWindow: InfoWindow(
-                    //             title: "No Curve",
-                    //           ))
                   },
                 ),
                 if (isSearching) ...[
