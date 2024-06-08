@@ -1,7 +1,7 @@
 import 'package:drive_guide/tracking.dart';
 import 'package:flutter/material.dart';
-import 'login_page.dart';
-import 'signup_page.dart';
+import 'User/login_page.dart';
+import 'User/signup_page.dart';
 
 class WelcomePage extends StatelessWidget {
   @override

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:drive_guide/firebase_options.dart';
-import 'package:drive_guide/login_page.dart';
+import 'package:drive_guide/Config/firebase_options.dart';
+import 'package:drive_guide/User/login_page.dart';
 import 'package:drive_guide/tracking.dart';
 import 'package:drive_guide/welcome_page.dart';
 import 'package:firebase_core/firebase_core.dart';

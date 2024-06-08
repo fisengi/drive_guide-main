@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/src/material/colors.dart' as forColors;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'roadCurveAlgorithm.dart';
+import '../Services/roadCurveAlgorithm.dart';
 
 //SIMULATION VARIABLES
 double speedSliderValue = 60;

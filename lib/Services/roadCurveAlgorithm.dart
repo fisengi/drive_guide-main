@@ -1,11 +1,11 @@
 library roadCurveAlgorithm;
 
 import 'dart:math';
-import 'package:drive_guide/simulationFunctions.dart';
+import 'package:drive_guide/Services/simulationFunctions.dart';
 import 'package:flutter_beep/flutter_beep.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'globals.dart';
+import '../Config/globals.dart';
 import 'package:flutter/src/material/colors.dart' as forColors;
 
 double degreesToRadians(degrees) {

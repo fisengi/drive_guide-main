@@ -1,8 +1,8 @@
 import 'package:drive_guide/Models/Account.dart';
+import 'package:drive_guide/User/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:drive_guide/tracking.dart';
-import 'package:drive_guide/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   @override

@@ -4,8 +4,8 @@ import 'dart:ffi' hide Size;
 import 'dart:ui';
 
 import 'package:drive_guide/Models/Account.dart';
-import 'package:drive_guide/login_page.dart';
-import 'package:drive_guide/profile_page.dart';
+import 'package:drive_guide/User/login_page.dart';
+import 'package:drive_guide/User/profile_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:location/location.dart';
 import 'package:flutter_google_places/flutter_google_places.dart';
@@ -17,7 +17,7 @@ import 'package:flutter_beep/flutter_beep.dart';
 //keep all member in the view, yavaşsa detaylı hızlıysa biraz daha detaysız göster. yakın curveleri tek circleda göster. curvelerin sıklığına göre derecesi değişiyor. curvelerde uyarı zamanı hıza göre değişecek
 // hızların sağ üste ekle hız sınırı viraj keskinliği rakamsal olarak Sesli uyarı. Redis grup view. Group sesli konuşma. Chat view
 
-import 'constant.dart';
+import 'Config/constant.dart';
 import 'group_view.dart';
 
 import 'package:flutter/src/material/colors.dart' as forColors;
@@ -29,9 +29,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:vector_math/vector_math.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'roadCurveAlgorithm.dart';
-import 'simulationFunctions.dart';
-import 'globals.dart';
+import 'Services/roadCurveAlgorithm.dart';
+import 'Services/simulationFunctions.dart';
+import 'Config/globals.dart';
 
 class TrackingPage extends StatefulWidget {
   final User user;

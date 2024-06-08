@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:drive_guide/roadCurveAlgorithm.dart';
+import 'package:drive_guide/Services/roadCurveAlgorithm.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'package:geolocator/geolocator.dart';
 
-import 'globals.dart';
-import 'tracking.dart';
+import '../Config/globals.dart';
+import '../tracking.dart';
 
 List<LatLng> interpolatePoints(
     LatLng start, LatLng end, double intervalMeters) {
