@@ -27,11 +27,12 @@ int curveIndex = 0;
 Color warningColor = forColors.Colors.green;
 Timer? timer;
 List<curveAndLatlng> curveWithLatlng = [];
-List<double> curves = [];
-List<LatLng> redcircles = [];
-List<LatLng> orangecircles = [];
+// List<double> curves = [];
+// List<LatLng> redcircles = [];
+// List<LatLng> orangecircles = [];
 List<ZoomOutTurnAngle> allCircles = [];
 List<LatLng> polylineCoordinates = [];
+int maxSpeed = 0;
 
 class curveAndLatlng {
   double? curve;

@@ -29,12 +29,10 @@ double radiansToDegrees(double radians) {
   return radians * 180 / pi;
 }
 
-List<double> calculateTurnAngle(List<LatLng> polypoints,
-    List<LatLng> redcircles, List<LatLng> orangecircles) {
-  List<double> curves = [];
-
-  redcircles.clear();
-  orangecircles.clear();
+List<curveAndLatlng> calculateTurnAngle(List<LatLng> polypoints) {
+  // List<double> curves = [];
+  curveWithLatlng.clear();
+  allCircles.clear();
 
   for (int i = 0; i < polypoints.length - 2; i++) {
     double initialBearing = calculateBearing(
@@ -47,6 +45,17 @@ List<double> calculateTurnAngle(List<LatLng> polypoints,
         polypoints[i + 1].longitude,
         polypoints[i + 2].latitude,
         polypoints[i + 2].longitude);
+
+    // double turnAngle_2 = (finalBearing - initialBearing + 540) % 360 - 180;
+
+    // // Depending on the turn angle, add circles with different colors
+    // if (turnAngle_2 > 40) {
+    //   allCircles.add(ZoomOutTurnAngle(1, polypoints[i + 1], "red"));
+    // } else if (turnAngle_2 > 20) {
+    //   allCircles.add(ZoomOutTurnAngle(1, polypoints[i + 1], "orange"));
+    // }
+
+    // curveWithLatlng.add(curveAndLatlng(turnAngle_2, polypoints[i + 1]));
 
     double turnAngle = finalBearing - initialBearing;
 
@@ -65,14 +74,16 @@ List<double> calculateTurnAngle(List<LatLng> polypoints,
       }
     }
     if (turnAngle > 40) {
-      redcircles.add(polypoints[i + 1]);
+      allCircles.add(ZoomOutTurnAngle(2, polypoints[i + 1], "red"));
     } else if (turnAngle < 40 && turnAngle > 20) {
-      orangecircles.add(polypoints[i + 1]);
-    } else {}
-    curves.add(turnAngle);
+      allCircles.add(ZoomOutTurnAngle(1, polypoints[i + 1], "orange"));
+    }
+    // curves.add(turnAngle);
+    curveWithLatlng.add(curveAndLatlng(turnAngle, polylineCoordinates[i + 1]));
   }
 
-  return curves;
+  checkForDistanceInCircles();
+  return curveWithLatlng;
 }
 
 class ZoomOutTurnAngle {
@@ -81,83 +92,34 @@ class ZoomOutTurnAngle {
   String color;
 
   ZoomOutTurnAngle(this.circleSize, this.coordination, this.color);
-
-  // void incCircleSize() {
-  //   this.circleSize++;
-  // }
 }
 
-List<ZoomOutTurnAngle> calculateTurnAngleZoomOut(
-  List<LatLng> polypoints,
-) {
-  List<ZoomOutTurnAngle> allCircles = [];
-
-  for (int i = 0; i < polypoints.length - 2; i++) {
-    double initialBearing = calculateBearing(
-        polypoints[i].latitude,
-        polypoints[i].longitude,
-        polypoints[i + 1].latitude,
-        polypoints[i + 1].longitude);
-    double finalBearing = calculateBearing(
-        polypoints[i + 1].latitude,
-        polypoints[i + 1].longitude,
-        polypoints[i + 2].latitude,
-        polypoints[i + 2].longitude);
-
-    double turnAngle = finalBearing - initialBearing;
-
-    if (turnAngle < 0) {
-      turnAngle = turnAngle.abs();
-      if (turnAngle > 180) {
-        turnAngle -= 360;
-        if (turnAngle < 0) {
-          turnAngle = turnAngle.abs();
-        }
-      }
-    } else if (turnAngle > 180) {
-      turnAngle -= 360;
-      if (turnAngle < 0) {
-        turnAngle = turnAngle.abs();
-      }
-    }
-    if (turnAngle > 40) {
-      allCircles.add(ZoomOutTurnAngle(1, polypoints[i + 1], "red"));
-    } else if (turnAngle < 40 && turnAngle > 20) {
-      allCircles.add(ZoomOutTurnAngle(1, polypoints[i + 1], "orange"));
-    } else {}
-  }
-  List<ZoomOutTurnAngle> returnCircles = checkForDistanceInCircles(allCircles);
-
-  return returnCircles;
-}
-
-List<ZoomOutTurnAngle> checkForDistanceInCircles(
-    List<ZoomOutTurnAngle> circles) {
+void checkForDistanceInCircles() {
   double distance;
   List<ZoomOutTurnAngle> tobeDeleted = [];
   List<ZoomOutTurnAngle> tobeAdded = [];
 
-  for (int i = 0; i < circles.length - 1; i++) {
+  for (int i = 0; i < allCircles.length - 1; i++) {
     List<ZoomOutTurnAngle> tempCircles = [];
     distance = Geolocator.distanceBetween(
-      circles[i].coordination.latitude,
-      circles[i].coordination.longitude,
-      circles[i + 1].coordination.latitude,
-      circles[i + 1].coordination.longitude,
+      allCircles[i].coordination.latitude,
+      allCircles[i].coordination.longitude,
+      allCircles[i + 1].coordination.latitude,
+      allCircles[i + 1].coordination.longitude,
     );
-    if (distance < 200) {
-      tempCircles.add(circles[i]);
-      tempCircles.add(circles[i + 1]);
-      for (int j = i + 1; j < circles.length - 1; j++) {
+    if (distance < 100) {
+      tempCircles.add(allCircles[i]);
+      tempCircles.add(allCircles[i + 1]);
+      for (int j = i + 1; j < allCircles.length - 1; j++) {
         if (distance +
                 Geolocator.distanceBetween(
-                  circles[j].coordination.latitude,
-                  circles[j].coordination.longitude,
-                  circles[j + 1].coordination.latitude,
-                  circles[j + 1].coordination.longitude,
+                  allCircles[j].coordination.latitude,
+                  allCircles[j].coordination.longitude,
+                  allCircles[j + 1].coordination.latitude,
+                  allCircles[j + 1].coordination.longitude,
                 ) <
-            200) {
-          tempCircles.add(circles[j + 1]);
+            100) {
+          tempCircles.add(allCircles[j + 1]);
           i = j + 1;
         } else {
           i = j;
@@ -178,20 +140,9 @@ List<ZoomOutTurnAngle> checkForDistanceInCircles(
     }
   }
   for (int l = 0; l < tobeDeleted.length; l++) {
-    circles.removeWhere((element) => element == tobeDeleted[l]);
+    allCircles.removeWhere((element) => element == tobeDeleted[l]);
   }
-  circles.addAll(tobeAdded);
-
-  return circles;
-}
-
-Future<void> loadLatlngToCurves(
-    List<LatLng> polylineCoordinates, List<double> curves) async {
-  curveWithLatlng.clear();
-
-  for (int i = 0; i < curves.length; i++) {
-    curveWithLatlng.add(curveAndLatlng(curves[i], polylineCoordinates[i + 1]));
-  }
+  allCircles.addAll(tobeAdded);
 }
 
 void speedControl(LatLng coordinatOfCar, int speedOfCar) {
@@ -208,37 +159,68 @@ void speedControl(LatLng coordinatOfCar, int speedOfCar) {
   } else {
     if (temp < distanceToCurve) {
       distanceToCurve = temp;
-      if (distanceToCurve < 200) {
-        checkSpeedAndCurve(speedOfCar);
+
+      if (speedOfCar > 120) {
+        if (distanceToCurve < 400) {
+          checkSpeedAndCurve(speedOfCar);
+        }
+      } else if (speedOfCar > 100) {
+        if (distanceToCurve < 200) {
+          checkSpeedAndCurve(speedOfCar);
+        }
+      } else if (speedOfCar > 80) {
+        if (distanceToCurve < 150) {
+          checkSpeedAndCurve(speedOfCar);
+        }
+      } else if (speedOfCar > 60) {
+        if (distanceToCurve < 100) {
+          checkSpeedAndCurve(speedOfCar);
+        }
+      } else {
+        if (distanceToCurve < 70) {
+          checkSpeedAndCurve(speedOfCar);
+        }
       }
     }
   }
 }
 
+double maxSpeedForCurve(double curveAngle) {
+  // Calculate maximum speed
+  double radius = 500.0 / curveAngle;
+  double maxSpeed = sqrt(0.7 * 9.81 * radius);
+
+  // Convert max speed from m/s to km/h
+  return maxSpeed * 3.6; // 1 m/s = 3.6 km/h
+}
+
 void checkSpeedAndCurve(int speedOfCar) {
   var curve = curveWithLatlng[curveIndex].curve!;
-  if (speedOfCar < 80 && warningColor != forColors.Colors.green ||
-      (curve < 10 && warningColor != forColors.Colors.green)) {
+  double calculatedMaxSpeed = maxSpeedForCurve(curve);
+
+  print("Calculated speed=> ${calculatedMaxSpeed} + Curve Angle =>${curve}");
+
+  if (calculatedMaxSpeed > 140) {
+    maxSpeed = 140;
+  } else if (calculatedMaxSpeed < 40) {
+    maxSpeed = 40;
+  } else {
+    maxSpeed = (calculatedMaxSpeed ~/ 10) * 10;
+  }
+
+  if (calculatedMaxSpeed - speedOfCar > 0 &&
+      warningColor != forColors.Colors.green) {
     warningColor = forColors.Colors.green;
-  } else if (curve > 30 &&
-      speedOfCar > 80 &&
-      warningColor != forColors.Colors.yellow) {
-    if (warningColor != forColors.Colors.yellow) {
-      warningColor = forColors.Colors.yellow;
-    }
-
-    FlutterBeep.beep();
-
-    print("MAX SPEED 100");
-  } else if (curve > 20 &&
-      speedOfCar > 90 &&
+  } else if (calculatedMaxSpeed - speedOfCar < 0 &&
+      calculatedMaxSpeed - speedOfCar > -20 &&
       warningColor != forColors.Colors.orange) {
     if (warningColor != forColors.Colors.orange) {
       warningColor = forColors.Colors.orange;
     }
 
     FlutterBeep.beep();
-  } else if (curve > 10 && speedOfCar > 100) {
+  } else if (calculatedMaxSpeed - speedOfCar < 0 &&
+      calculatedMaxSpeed - speedOfCar < -20) {
     if (warningColor != forColors.Colors.red) {
       warningColor = forColors.Colors.red;
     }

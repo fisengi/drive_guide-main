@@ -224,7 +224,7 @@ class TrackingPageState extends State<TrackingPage> {
 
   void addCustomIcon() {
     BitmapDescriptor.fromAssetImage(
-            const ImageConfiguration(), "images/DriveGuide_2.png")
+            const ImageConfiguration(), "images/DriveGuide.png")
         .then((icon) {
       setState(() {
         carIcon = icon;
@@ -363,14 +363,18 @@ class TrackingPageState extends State<TrackingPage> {
       startOrRestartTimer(lastRouteIndex, distanceToCurve, curveIndex);
     } else {
       _initCarMarker();
-
+      double initialBearing = calculateBearing(
+          simulationCoordinates[lastRouteIndex].latitude,
+          simulationCoordinates[lastRouteIndex].longitude,
+          simulationCoordinates[lastRouteIndex + 1].latitude,
+          simulationCoordinates[lastRouteIndex + 1].longitude);
       final GoogleMapController controller = await _controller.future;
+
       await controller?.animateCamera(CameraUpdate.newCameraPosition(
         CameraPosition(
           target: sourceLocation,
-          bearing:
-              270.0, //calculate bearing, interpolated points, köksalla konuş bunu
-          tilt: 30.0,
+          bearing: initialBearing,
+          tilt: 20.0,
           zoom: 19.0,
         ),
       ));
@@ -379,6 +383,7 @@ class TrackingPageState extends State<TrackingPage> {
       lastRouteIndex = 0;
       distanceToCurve = double.infinity;
       curveIndex = 0;
+      maxSpeed = 0;
       // Resetting and starting the simulation with the initial speed.
       startOrRestartTimer(lastRouteIndex, distanceToCurve, curveIndex);
     }
@@ -403,7 +408,8 @@ class TrackingPageState extends State<TrackingPage> {
               simulationCoordinates[startIndex], speedSliderValue.round());
         }
 
-        updatePosition(simulationCoordinates[startIndex]);
+        updatePosition(simulationCoordinates[startIndex],
+            simulationCoordinates[lastRouteIndex]);
         lastRouteIndex = startIndex; // Update the last position of routeIndex
         startIndex++;
       } else {
@@ -419,9 +425,18 @@ class TrackingPageState extends State<TrackingPage> {
         curveIndex); // Restart the timer with new interval.
   }
 
-  void updatePosition(LatLng newPosition) async {
+  void updatePosition(LatLng newPosition, LatLng oldPosition) async {
     final GoogleMapController controller = await _controller.future;
-    controller.animateCamera(CameraUpdate.newLatLng(newPosition));
+    double bearing = calculateBearing(oldPosition.latitude,
+        oldPosition.longitude, newPosition.latitude, newPosition.longitude);
+    controller.animateCamera(CameraUpdate.newCameraPosition(
+      CameraPosition(
+        target: newPosition,
+        bearing: bearing,
+        tilt: 20.0,
+        zoom: 19.0,
+      ),
+    ));
     setState(() {
       carMarker = Marker(
         markerId: MarkerId("car"),
@@ -683,12 +698,9 @@ class TrackingPageState extends State<TrackingPage> {
     buildSpeedWarner();
 
     if (destination != null) {
-      curves =
-          calculateTurnAngle(polylineCoordinates, redcircles, orangecircles);
+      curveWithLatlng = calculateTurnAngle(polylineCoordinates);
 
-      loadLatlngToCurves(polylineCoordinates, curves);
-
-      allCircles = calculateTurnAngleZoomOut(polylineCoordinates);
+      // loadLatlngToCurves(polylineCoordinates, curves);
     }
 
     Set<Circle> circlesss = {
@@ -717,23 +729,21 @@ class TrackingPageState extends State<TrackingPage> {
     return Scaffold(
       appBar: simulationMode && destination != null
           ? AppBar(
+              backgroundColor: warningColor,
               title: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: warningColor,
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: Center(
-                child: Text(
-                  '$speedSliderValue',
-                  style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: forColors.Colors.white),
+                width: 100,
+                height: 100,
+                child: Center(
+                  child: Text(
+                    '$speedSliderValue',
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: forColors.Colors.white),
+                  ),
                 ),
               ),
-            ))
+            )
           : AppBar(
               actions: [
                   Switch(
@@ -853,6 +863,32 @@ class TrackingPageState extends State<TrackingPage> {
                       ),
                   },
                 ),
+                if (simulationMode)
+                  Positioned(
+                    top: 16, // Adjust padding as needed
+                    left: 16, // Adjust padding as needed
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: forColors.Colors.white,
+                        borderRadius: BorderRadius.circular(50),
+                        border: Border.all(
+                          color: forColors.Colors.red,
+                          width: 6,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$maxSpeed',
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: forColors.Colors.black),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (isSearching) ...[
                   BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
