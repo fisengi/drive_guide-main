@@ -33,11 +33,6 @@ List<LatLng> orangecircles = [];
 List<ZoomOutTurnAngle> allCircles = [];
 List<LatLng> polylineCoordinates = [];
 
-class kullanici {
-  int? speed;
-  LatLng? coordination;
-}
-
 class curveAndLatlng {
   double? curve;
   LatLng? coordination;

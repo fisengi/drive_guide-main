@@ -224,7 +224,7 @@ class TrackingPageState extends State<TrackingPage> {
 
   void addCustomIcon() {
     BitmapDescriptor.fromAssetImage(
-            const ImageConfiguration(), "images/DriveGuide.png")
+            const ImageConfiguration(), "images/DriveGuide_2.png")
         .then((icon) {
       setState(() {
         carIcon = icon;
@@ -326,6 +326,9 @@ class TrackingPageState extends State<TrackingPage> {
       carMarker = null;
       simulationMode = false;
       polylineCoordinates.clear();
+      destination = null;
+      allCircles.clear();
+      searchController.clear();
     });
 
     // Optionally reset the camera to a default position or zoom out
@@ -352,25 +355,33 @@ class TrackingPageState extends State<TrackingPage> {
   }
 
   Future<void> startSimulation() async {
-    _initCarMarker();
+    if (isStopped) {
+      print("continue");
+      setState(() {
+        isStopped = false;
+      });
+      startOrRestartTimer(lastRouteIndex, distanceToCurve, curveIndex);
+    } else {
+      _initCarMarker();
 
-    final GoogleMapController controller = await _controller.future;
-    await controller?.animateCamera(CameraUpdate.newCameraPosition(
-      CameraPosition(
-        target: sourceLocation,
-        bearing:
-            270.0, //calculate bearing, interpolated points, köksalla konuş bunu
-        tilt: 30.0,
-        zoom: 19.0,
-      ),
-    ));
+      final GoogleMapController controller = await _controller.future;
+      await controller?.animateCamera(CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: sourceLocation,
+          bearing:
+              270.0, //calculate bearing, interpolated points, köksalla konuş bunu
+          tilt: 30.0,
+          zoom: 19.0,
+        ),
+      ));
 
-    await Future.delayed(const Duration(seconds: 5));
-    lastRouteIndex = 0;
-    distanceToCurve = double.infinity;
-    curveIndex = 0;
-    // Resetting and starting the simulation with the initial speed.
-    startOrRestartTimer(lastRouteIndex, distanceToCurve, curveIndex);
+      await Future.delayed(const Duration(seconds: 5));
+      lastRouteIndex = 0;
+      distanceToCurve = double.infinity;
+      curveIndex = 0;
+      // Resetting and starting the simulation with the initial speed.
+      startOrRestartTimer(lastRouteIndex, distanceToCurve, curveIndex);
+    }
   }
 
   void startOrRestartTimer(
@@ -397,7 +408,7 @@ class TrackingPageState extends State<TrackingPage> {
         startIndex++;
       } else {
         t.cancel();
-        print("Reached destination");
+        print("Reached destination or Paused");
       }
     });
   }
@@ -659,7 +670,7 @@ class TrackingPageState extends State<TrackingPage> {
     // _startGroupLocationUpdates();
     searchController.addListener(_onSearchChanged);
 
-    _initCarMarker();
+    // _initCarMarker();
     _groupCarMarker();
 
     _fetchAccount();
@@ -769,7 +780,7 @@ class TrackingPageState extends State<TrackingPage> {
             ),
             ListTile(
               leading: Icon(Icons.group),
-              title: Text("${account?.userId}"),
+              title: Text("Koksal"),
               onTap: () {
                 groupViewMode = true;
                 _initGroupView(context);
@@ -804,7 +815,7 @@ class TrackingPageState extends State<TrackingPage> {
           ],
         ),
       ),
-      body: _currentP == null
+      body: currentLocation == null
           ? Center(
               child: Text("loading"),
             )
@@ -929,11 +940,11 @@ class TrackingPageState extends State<TrackingPage> {
                                 _buildActionButton(
                                     context, Icons.pause, 'Pause Simulation',
                                     () {
-                                  pauseSimulation(); // You'll need to implement this
+                                  pauseSimulation();
                                 }),
                                 _buildActionButton(
                                     context, Icons.stop, 'Stop Simulation', () {
-                                  stopSimulation(); // You'll need to implement this
+                                  stopSimulation();
                                 }),
                               ],
                             ),

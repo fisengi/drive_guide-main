@@ -81,6 +81,7 @@ flutter:
     assets:
         - images/dg_logo.png
         - images/DriveGuide.png
+        - images/DriveGuide_2.png
         - images/Group_Member.png
         - images/google_logo.png
         - images/default_profilepicture.png

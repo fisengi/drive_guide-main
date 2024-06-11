@@ -42,6 +42,20 @@ List<LatLng> interpolatePoints(
   return points;
 }
 
+void loadRouteSimulation(List<LatLng> coordinates) {
+  simulationCoordinates.clear();
+
+  for (int i = 0; i < coordinates.length - 1; i++) {
+    simulationCoordinates
+        .addAll(interpolatePoints(coordinates[i], coordinates[i + 1], 1));
+  }
+
+  for (int i = 0; i < simulationCoordinates.length - 1; i++) {
+    if (simulationCoordinates[i] == simulationCoordinates[i + 1])
+      simulationCoordinates.removeAt(i);
+  }
+}
+
 class SpeedSliderWidget extends StatefulWidget {
   final Function(double) onValueChanged;
   const SpeedSliderWidget({Key? key, required this.onValueChanged})

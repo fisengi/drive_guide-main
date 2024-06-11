@@ -128,11 +128,6 @@ List<ZoomOutTurnAngle> calculateTurnAngleZoomOut(
   }
   List<ZoomOutTurnAngle> returnCircles = checkForDistanceInCircles(allCircles);
 
-  // for (int i = 0; i < returnCircles.length; i++) {
-  //   print(
-  //       "Circle ${i} => ${returnCircles[i].color}, ${returnCircles[i].circleSize}, ${returnCircles[i].coordination}");
-  // }
-
   return returnCircles;
 }
 
@@ -196,20 +191,6 @@ Future<void> loadLatlngToCurves(
 
   for (int i = 0; i < curves.length; i++) {
     curveWithLatlng.add(curveAndLatlng(curves[i], polylineCoordinates[i + 1]));
-  }
-}
-
-void loadRouteSimulation(List<LatLng> coordinates) {
-  simulationCoordinates.clear();
-
-  for (int i = 0; i < coordinates.length - 1; i++) {
-    simulationCoordinates
-        .addAll(interpolatePoints(coordinates[i], coordinates[i + 1], 1));
-  }
-
-  for (int i = 0; i < simulationCoordinates.length - 1; i++) {
-    if (simulationCoordinates[i] == simulationCoordinates[i + 1])
-      simulationCoordinates.removeAt(i);
   }
 }
 
